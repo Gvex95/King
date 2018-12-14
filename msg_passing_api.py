@@ -30,7 +30,7 @@ def sendMsg(remote_server_address, msg):
 
 
 def rcvMsg(queue):
-    return queue.get(True, 60)
+    return queue.get()
 
 def broadcastMsg(list_of_remote_server_address, msg):
     for remote_server_address in list_of_remote_server_address:

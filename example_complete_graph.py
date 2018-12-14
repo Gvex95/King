@@ -1,6 +1,7 @@
 import sys
 from multiprocessing import Process, Queue
 from msg_passing_api import *
+from datetime import datetime
 
 def even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process):
 
@@ -10,15 +11,48 @@ def even_round(k, remote_server_addresses, init_preference, queue, number_of_pro
     # Find new king and send your mayor to everybody
     if (proc_index == k):
         print('Node: ', proc_index, ' I am king mother fuckers, broadcasting...')
+
+        recivedOKMessagesCounter = 0
+        responded_proces = []
         broadcastMsg(remote_server_addresses, pref[proc_index])
-    # If you are not king, recive message and determine new mayor for yourself
-    else:
-        print('Node: ', proc_index, ' waiting for mayor from king...')
+
+        i = datetime.now()
+        print (str(i))
+
+        print('I have sent my mayor to all my minions')
+
+
+        # wait for comfirmation
         msgs = rcvMsgs(queue, number_of_proc - 1)
 
-        if len(msgs) == 1:
-            king_mayor = msgs[0]
+        recivedOKMessagesCounter = len(msgs)
+
+        if (recivedOKMessagesCounter != num_of_fault_process - 1):
+            print('Some process did not send comfirmation message!!!')
+        else:
+            print('Recived comformation from all..')
+
+
+    # If you are not king, recive message and determine new mayor for yourself
+    else:
+
+        i = datetime.now()
+        print (str(i))
+
+        print('Node: ', proc_index, ' waiting for mayor from king...')
+
+        # Recevie message from king
+        msg = rcvMsgs(queue, 1)
+
+        print('Recived major from king')
+        #Sanity check
+        if len(msg) == 1:
+            king_mayor = msg[0]
             print('Node: ', proc_index, ' recived mayor: ', local_mayor, ' from king: ', k)
+
+        print('Send confirmation that i recived msg from king')
+        sendMsg(remote_server_addresses[k], "OK KRALJU")
+
 
         if (mult > (number_of_proc / 2) + num_of_fault_process):
             print('Node: ', proc_index, ' will keep local mayor: ', local_mayor)
@@ -43,6 +77,7 @@ def odd_round(round, remote_server_addresses, init_preference, queue, number_of_
     msgs = rcvMsgs(queue, number_of_proc - 1)
     print('Node: ', proc_index, 'messages received:', msgs)
 
+    pref = [None] * 5
     #Saving messages from other nodes to prefs lists
     #Copy recived list
     pref = msgs[:]
@@ -51,20 +86,21 @@ def odd_round(round, remote_server_addresses, init_preference, queue, number_of_
     print('Node: ', proc_index, 'prefs list state after reciving messages: ', pref)
 
     # Calculating mayor
+    dictonary = {"Valid": 0, "Invalid":0}
     for i in range(len(pref)):
-        if (pref[i] == init_preference):
-            counter += 1
+        if pref[i] == 1:
+            dictonary["Valid"] += 1
+        else:
+            dictonary["Invalid"] += 1
 
-    mayor = 0
+    print('Dictonary: ', dictonary)
 
-    print('Node: ', proc_index, ' mayor number is: ', mayor)
-
-    #Calculating mult
-    mult = 0
-    for i in range(len(msgs)):
-        if (msgs[i] == mayor):
-            mult += 1
-    print('Node: ', proc_index, ' mult number is: ', mult)
+    if (dictonary["Valid"] > dictonary["Invalid"]):
+        mayor = 1
+        mult = dictonary["Valid"]
+    else:
+        mayor = 0
+        mult = dictonary["Invalid"]
 
     print('Round: ', round, 'Node: ', proc_index,  'state: ', 'Pref: ', pref, ' Major: ', mayor, ' Mult: ', mult)
     dict = {"Mayor":mayor, "Mult":mult, "Pref":pref}
@@ -120,9 +156,17 @@ def main():
             mayor = dict.get("Mayor")
             mult = dict.get("Mult")
             pref = dict.get("Pref")
-            print('MRS: ', mayor, mult, pref)
+            print('MRS: ', mayor, mult, pref, '\n')
+            print('################################')
+
         else:
             k, mayor, mult, pref = even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process)
+            print('Round: ', round, 'ended, ', 'params:\n')
+            print('K:', k, '\n')
+            print('Major:', mayor, '\n')
+            print('Mult:', mult, '\n')
+            print('Pref:', pref, '\n')
+            print('################################')
             even_counter += 1
 
     print(" Got out of while loop")
