@@ -2,7 +2,38 @@ import sys
 from multiprocessing import Process, Queue
 from msg_passing_api import *
 
-def odd_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref):
+def even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process):
+
+    local_mayor = mayor
+    king_mayor = -1
+
+    # Find new king and send your mayor to everybody
+    if (proc_index == k):
+        print('Node: ', proc_index, ' I am king mother fuckers, broadcasting...')
+        broadcastMsg(remote_server_addresses, pref[proc_index])
+    # If you are not king, recive message and determine new mayor for yourself
+    else:
+        print('Node: ', proc_index, ' waiting for mayor from king...')
+        msgs = rcvMsgs(queue, number_of_proc - 1)
+
+        if len(msgs) == 1:
+            king_mayor = msgs[0]
+            print('Node: ', proc_index, ' recived mayor: ', local_mayor, ' from king: ', k)
+
+        if (mult > (number_of_proc / 2) + num_of_fault_process):
+            print('Node: ', proc_index, ' will keep local mayor: ', local_mayor)
+            pref[proc_index] = local_mayor
+
+        else:
+            print('Node: ', proc_index, ' will take kings mayor: ', king_mayor)
+            pref[proc_index] = king_mayor
+
+
+    print('Round: ', 2*k, 'Node: ', proc_index,  'state: ', 'Pref: ', pref, ' Major: ', mayor, ' Mult: ', mult)
+    k = k + 1
+    return k, mayor,mult, pref
+
+def odd_round(round, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref):
     counter = 0
 
     # Send message to peer node's servers
@@ -20,29 +51,24 @@ def odd_round(k, remote_server_addresses, init_preference, queue, number_of_proc
     print('Node: ', proc_index, 'prefs list state after reciving messages: ', pref)
 
     # Calculating mayor
-    for i in range(len(msgs)):
-        if (msgs[i] == init_preference):
+    for i in range(len(pref)):
+        if (pref[i] == init_preference):
             counter += 1
 
-    if (counter > (len(msgs) - counter)):
-        mayor = init_preference
-    elif (counter < (len(msgs) - counter)):
-        for i in range(len(msgs)):
-            if (init_preference != msgs[i]):
-                mayor = msgs[i]
-    else:
-        mayor = 0
+    mayor = 0
 
     print('Node: ', proc_index, ' mayor number is: ', mayor)
 
-    #Calculating mult 
+    #Calculating mult
     mult = 0
-    for i in range(len(pref)):
-        if (pref[i] == mayor):
+    for i in range(len(msgs)):
+        if (msgs[i] == mayor):
             mult += 1
     print('Node: ', proc_index, ' mult number is: ', mult)
 
-    print('Round: ', 2*k-1, 'Node: ', proc_index,  'state: ', 'Pref: ', pref, ' Major: ', mayor, ' Mult: ', mult)
+    print('Round: ', round, 'Node: ', proc_index,  'state: ', 'Pref: ', pref, ' Major: ', mayor, ' Mult: ', mult)
+    dict = {"Mayor":mayor, "Mult":mult, "Pref":pref}
+    return dict
 
 def main():
     # Parse command line arguments
@@ -80,27 +106,31 @@ def main():
     pref = [None] * number_of_proc
     mult = 0
     mayor = 0
+    even_counter = 0;
+    result = [None] * number_of_proc
 
     msg = input('Enter message: ')
-    # k != num_of_fault_process + 1 while condition
-    while (True):
+    #  while condition
+    while (even_counter != num_of_fault_process + 1):
 
-        round+=1
+        round = round + 1
 
-        if (round % 2 == 0):
-            odd_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref)
-            break
-        # if (recived_sum == 2 * (counter)):
-        #     print("Phase :", counter, " passed ok, moving to next phase")
-        #     print("There are: ", max_phases - counter, " phases remaining...")
-        #     recived_sum = 0
-        #
-        # else:
-        #     print(" Wrong phase: ", counter)
-        #     print("State: \n", "Counter: ", counter, "\n", "Recived Sum: ", recived_sum, "\n")
+        if (round % 2 == 1):
+            dict = odd_round(round, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref)
+            mayor = dict.get("Mayor")
+            mult = dict.get("Mult")
+            pref = dict.get("Pref")
+            print('MRS: ', mayor, mult, pref)
+        else:
+            k, mayor, mult, pref = even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process)
+            even_counter += 1
 
     print(" Got out of while loop")
+    result[proc_index] = pref[proc_index]
+
+    print('Result: ', result)
     sendMsg( ('localhost', local_port), 'exit')
+
 
     # Join with server process
     server.join()
