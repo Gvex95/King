@@ -3,39 +3,14 @@ from multiprocessing import Process, Queue
 from msg_passing_api import *
 from datetime import datetime
 
-def even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process):
+def even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process, pref1):
 
     local_mayor = mayor
     king_mayor = -1
-
-    # Find new king and send your mayor to everybody
-    if (proc_index == k):
-        print('Node: ', proc_index, ' I am king mother fuckers, broadcasting...')
-
-        recivedOKMessagesCounter = 0
-        responded_proces = []
-        broadcastMsg(remote_server_addresses, pref[proc_index])
-
-        i = datetime.now()
-        print (str(i))
-
-        print('I have sent my mayor to all my minions')
-
-
-        # wait for comfirmation
-        msgs = rcvMsgs(queue, number_of_proc - 1)
-
-        recivedOKMessagesCounter = len(msgs)
-
-        if (recivedOKMessagesCounter != num_of_fault_process - 1):
-            print('Some process did not send comfirmation message!!!')
-        else:
-            print('Recived comformation from all..')
-
-
-    # If you are not king, recive message and determine new mayor for yourself
-    else:
-
+	
+	# Find new king and send your mayor to everybody
+    if (proc_index != k):
+	    
         i = datetime.now()
         print (str(i))
 
@@ -50,10 +25,6 @@ def even_round(k, remote_server_addresses, init_preference, queue, number_of_pro
             king_mayor = msg[0]
             print('Node: ', proc_index, ' recived mayor: ', local_mayor, ' from king: ', k)
 
-        print('Send confirmation that i recived msg from king')
-        sendMsg(remote_server_addresses[k], "OK KRALJU")
-
-
         if (mult > (number_of_proc / 2) + num_of_fault_process):
             print('Node: ', proc_index, ' will keep local mayor: ', local_mayor)
             pref[proc_index] = local_mayor
@@ -61,23 +32,39 @@ def even_round(k, remote_server_addresses, init_preference, queue, number_of_pro
         else:
             print('Node: ', proc_index, ' will take kings mayor: ', king_mayor)
             pref[proc_index] = king_mayor
+        
+        for i in range(len(pref)):
+            if (pref[proc_index] == local_mayor):
+                pref1[i] = 1
 
 
+    # If you are not king, recive message and determine new mayor for yourself
+    else:
+        print('Node: ', proc_index, ' I am king mother fuckers, broadcasting...')
+
+        responded_proces = []
+        broadcastMsg(remote_server_addresses, pref[proc_index])
+
+        i = datetime.now()
+        print (str(i))
+
+        print('I have sent my mayor to all my minions')
+
+		
     print('Round: ', 2*k, 'Node: ', proc_index,  'state: ', 'Pref: ', pref, ' Major: ', mayor, ' Mult: ', mult)
     k = k + 1
-    return k, mayor,mult, pref
+    return k, mayor,mult, pref, pref1
 
-def odd_round(round, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref):
+def odd_round(round, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, pref1):
     counter = 0
 
     # Send message to peer node's servers
-    broadcastMsg(remote_server_addresses, init_preference)
+    broadcastMsg(remote_server_addresses, pref[proc_index])
 
     # Get message from local node's server
     msgs = rcvMsgs(queue, number_of_proc - 1)
     print('Node: ', proc_index, 'messages received:', msgs)
 
-    pref = [None] * 5
     #Saving messages from other nodes to prefs lists
     #Copy recived list
     pref = msgs[:]
@@ -85,25 +72,18 @@ def odd_round(round, remote_server_addresses, init_preference, queue, number_of_
     pref.insert(proc_index, init_preference)
     print('Node: ', proc_index, 'prefs list state after reciving messages: ', pref)
 
-    # Calculating mayor
-    dictonary = {"Valid": 0, "Invalid":0}
-    for i in range(len(pref)):
-        if pref[i] == 1:
-            dictonary["Valid"] += 1
-        else:
-            dictonary["Invalid"] += 1
-
-    print('Dictonary: ', dictonary)
-
-    if (dictonary["Valid"] > dictonary["Invalid"]):
-        mayor = 1
-        mult = dictonary["Valid"]
-    else:
-        mayor = 0
-        mult = dictonary["Invalid"]
+    # Calculating mult
+    mult = 0
+    mayorIndex = -1
+    for i in range(len(pref1)):
+        if pref1[i] == 1:
+            mayorIndex = i
+            mult += 1
+    
+    mayor = pref[mayorIndex]
 
     print('Round: ', round, 'Node: ', proc_index,  'state: ', 'Pref: ', pref, ' Major: ', mayor, ' Mult: ', mult)
-    dict = {"Mayor":mayor, "Mult":mult, "Pref":pref}
+    dict = {"Mayor":mayor, "Mult":mult, "Pref":pref, "Pref1":pref1}
     return dict
 
 def main():
@@ -129,6 +109,7 @@ def main():
 
     #Create queue for messages from the local server
     queue = Queue()
+    
 
     #Create and start server process
     server = Process(target=server_fun, args=(local_port,queue))
@@ -140,32 +121,55 @@ def main():
     k = 1
     round = 0
     pref = [None] * number_of_proc
+    pref1 = [None] * number_of_proc
     mult = 0
     mayor = 0
     even_counter = 0;
     result = [None] * number_of_proc
+	
+    pref[proc_index] = init_preference
 
-    msg = input('Enter message: ')
+    msg = input('Enter 0 or 1 (0 for fault value, 1 is correct value): ')
+    
+    msg2 = input('Press any key to start...')
+    
+    print('Sending correct or fault values to all processess')
+    broadcastMsg(remote_server_addresses, int(msg))
+    
+    print('Receving correct or wrong from everyone else')
+    
+    
+    pref1 = rcvMsgs(queue, number_of_proc - 1)
+    pref1.insert(proc_index, int(msg))
+    
+    print('Pref1: ', pref1)
+    print('############################################')
+    
+    
+    
+    
     #  while condition
     while (even_counter != num_of_fault_process + 1):
 
         round = round + 1
 
         if (round % 2 == 1):
-            dict = odd_round(round, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref)
+            dict = odd_round(round, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, pref1)
             mayor = dict.get("Mayor")
             mult = dict.get("Mult")
             pref = dict.get("Pref")
+            pref1 = dict.get("Pref1")
             print('MRS: ', mayor, mult, pref, '\n')
             print('################################')
 
         else:
-            k, mayor, mult, pref = even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process)
+            k, mayor, mult, pref, pref1 = even_round(k, remote_server_addresses, init_preference, queue, number_of_proc, proc_index, mayor, mult, pref, num_of_fault_process, pref1)
             print('Round: ', round, 'ended, ', 'params:\n')
             print('K:', k, '\n')
             print('Major:', mayor, '\n')
             print('Mult:', mult, '\n')
             print('Pref:', pref, '\n')
+            print('Pref1:', pref1, '\n')
             print('################################')
             even_counter += 1
 
