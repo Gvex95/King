@@ -2,7 +2,6 @@ import sys
 from multiprocessing import Process, Queue
 from multiprocessing.connection import Client, Listener
 from array import array
-from datetime import datetime
 
 def server_fun(local_port, queue):
     # Set the address of the local node's server
@@ -23,14 +22,12 @@ def server_fun(local_port, queue):
                 # Exit if msg is 'exit'
                 if msg == 'exit':
                     break
-	
+
 
 def sendMsg(remote_server_address, msg):
         with Client(remote_server_address, authkey=b'Lets work together') as conn:
             #print(' Sending message to remote_server_addresses: ', remote_server_address, " message is: ", msg)
             conn.send(msg)
-            i = datetime.now()
-            print (str(i))
 
 def rcvMsg(queue):
     return queue.get()
